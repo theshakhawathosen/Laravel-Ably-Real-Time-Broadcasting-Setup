@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="./log.png" alt="Ably Logo" width="180"/>
+<img src="./logo.png" alt="Ably Logo" width="180"/>
 
 # Laravel + Ably — Real-Time Broadcasting Setup
 
