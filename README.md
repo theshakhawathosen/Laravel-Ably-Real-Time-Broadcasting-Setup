@@ -63,9 +63,19 @@ cd my-project
 composer require ably/ably-php ably/laravel-broadcaster
 ```
 
-### Client-side (JS)
+> `ably/ably-php` — core PHP SDK that sends messages to Ably server.  
+> `ably/laravel-broadcaster` — bridge that connects Laravel's `broadcast()` system to Ably.
+
+### Client-side (JS) — Choose ONE approach:
+
+#### Option A: NPM (recommended for Vite-based projects)
 ```bash
 npm install ably
+```
+
+#### Option B: CDN (no Node.js / npm required)
+```html
+<script src="https://cdn.ably.com/lib/ably.min-2.js"></script>
 ```
 
 > ⚠️ **Do NOT install `laravel-echo`** — it has known compatibility issues with Ably. Use the Ably JS client directly instead.
@@ -207,7 +217,9 @@ Broadcast::channel('App.Models.User.{id}', function ($user, $id) {
 
 ---
 
-## Step 9 — Configure app.js
+## Step 9 — Configure Client-side
+
+### Option A: NPM (app.js via Vite)
 
 Replace the contents of `resources/js/app.js`:
 
@@ -218,6 +230,12 @@ const realtime = new Ably.Realtime({ key: import.meta.env.VITE_ABLY_KEY });
 
 window.AblyClient = realtime;
 ```
+
+Make sure `VITE_ABLY_KEY` is set in your `.env`.
+
+### Option B: CDN (no app.js needed)
+
+Skip `app.js` entirely. Just add the CDN script directly in your Blade file (see Step 12 — Option B).
 
 ---
 
@@ -282,6 +300,8 @@ Route::get('/send', function () {
 
 ## Step 12 — Listen in Blade
 
+### Option A: NPM (using app.js via Vite)
+
 ```html
 <!DOCTYPE html>
 <html lang="en">
@@ -295,7 +315,7 @@ Route::get('/send', function () {
     <h1>Listening for messages...</h1>
 
     <script type="module">
-        const channel = window.AblyClient.channels.get('chat');
+        const channel = window.AblyClient.channels.get('public:chat');
 
         channel.subscribe('message.sent', (msg) => {
             console.log('Received:', msg.data);
@@ -307,6 +327,42 @@ Route::get('/send', function () {
 ```
 
 > ⚠️ Always use `<script type="module">` — without it, `window.AblyClient` will be `undefined` because `app.js` loads asynchronously as an ES module.
+
+---
+
+### Option B: CDN (no npm / Vite needed)
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Ably Test</title>
+</head>
+<body>
+
+    <h1>Listening for messages...</h1>
+
+    <script src="https://cdn.ably.com/lib/ably.min-2.js"></script>
+
+    <script>
+        const realtime = new Ably.Realtime({
+            key: '{{ config("broadcasting.connections.ably.key") }}'
+        });
+
+        const channel = realtime.channels.get('public:chat');
+
+        channel.subscribe('message.sent', (msg) => {
+            console.log('Received:', msg.data);
+        });
+    </script>
+
+</body>
+</html>
+```
+
+> ✅ No `type="module"` needed — CDN script loads synchronously so `Ably` is available immediately.  
+> ⚠️ **Channel name must be `public:chat`** — Laravel's Ably broadcaster automatically adds the `public:` prefix when broadcasting to a public channel. Your frontend must subscribe to `public:chat`, not `chat`.
 
 ---
 
@@ -343,6 +399,7 @@ php artisan serve
 | `Cannot read properties of undefined (reading 'channel')` | Missing `type="module"` on script tag | Add `type="module"` to your inline `<script>` |
 | `Broadcaster string ably is not supported` | Wrong version of laravel-echo | Remove laravel-echo; use Ably JS client directly |
 | `Ably error: Unauthorized` on server | `ABLY_KEY` missing or wrong in `.env` | Check `.env` and run `php artisan config:clear` |
+| Message not received even though event fires | Wrong channel name on frontend | Use `public:chat` not `chat` — Laravel adds `public:` prefix automatically |
 
 ---
 
@@ -378,10 +435,13 @@ php artisan serve
 
 ```
 Server package      →  ably/ably-php + ably/laravel-broadcaster
-Client package      →  ably  (npm)
+Client (NPM)        →  ably  (npm install ably)
+Client (CDN)        →  https://cdn.ably.com/lib/ably.min-2.js
 Laravel Echo        →  ❌ Not used (compatibility issues)
 Broadcast interface →  ShouldBroadcastNow  (no queue needed)
-Script type         →  type="module"  (required)
+Script type (NPM)   →  type="module"  (required)
+Script type (CDN)   →  regular <script>  (no module needed)
+Channel prefix      →  public:chat  (Laravel adds public: prefix automatically)
 API Key type        →  Root API Key with all Capabilities enabled
 ```
 
